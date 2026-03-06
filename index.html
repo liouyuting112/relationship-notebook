@@ -73,6 +73,112 @@
             transform: scale(0.95);
         }
 
+        .identity-view {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            background: var(--card);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            padding: 30px;
+            text-align: center;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid var(--border);
+            margin-top: 50px;
+        }
+
+        .identity-view h2 {
+            color: var(--pink);
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .id-btn {
+            background: #FFF0F3;
+            color: #A03B52;
+            border: 1px solid #FFE0E6;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-size: 16px;
+            transition: 0.2s;
+            width: 100%;
+        }
+
+        .id-btn:hover {
+            background: var(--pink);
+            color: #FFF;
+        }
+
+        .or-text {
+            margin: 20px 0;
+            color: #AAA;
+            font-size: 14px;
+            position: relative;
+            width: 100%;
+        }
+
+        .or-text::before,
+        .or-text::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 35%;
+            height: 1px;
+            background: #EEE;
+        }
+
+        .or-text::before {
+            left: 0;
+        }
+
+        .or-text::after {
+            right: 0;
+        }
+
+        .create-id-box {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .create-id-box input {
+            padding: 12px;
+            border: 1px solid #DDD;
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+            text-align: center;
+        }
+
+        .create-id-box button {
+            background: #E5E5E5;
+            color: #555;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .create-id-box button:hover {
+            background: var(--pink);
+            color: white;
+        }
+
+        .loader-view {
+            display: none;
+            margin-top: 100px;
+            font-weight: bold;
+            color: #888;
+            font-size: 18px;
+        }
+
         .app-view {
             display: none;
             width: 100%;
@@ -374,6 +480,23 @@
         <button class="btn-main" onclick="createRoom()">🏠 建立家庭共編空間</button>
     </div>
 
+    <!-- Loader View -->
+    <div class="loader-view" id="loaderView">
+        🔄 正在同步家庭紀錄...
+    </div>
+
+    <!-- Identity View -->
+    <div class="identity-view" id="identityView">
+        <h2>這是你的專屬聯絡簿</h2>
+        <p style="color: #666; font-size:14px; margin-bottom: 20px;">請選擇你是誰，或是建立一個自己的新身分：</p>
+        <div id="existingProfiles" style="width: 100%; display: flex; flex-direction: column; gap: 10px;"></div>
+        <div class="or-text" id="orTextId">或是</div>
+        <div class="create-id-box">
+            <input type="text" id="newIdentityName" placeholder="我是... (例如: 老婆、爸爸)">
+            <button onclick="createNewIdentity()">我要建立新身分</button>
+        </div>
+    </div>
+
     <!-- Main App View -->
     <div class="app-view" id="appView">
         <div class="header">
@@ -418,6 +541,7 @@
         let roomID = new URLSearchParams(window.location.search).get('room');
         let localData = { updatedAt: 0, profiles: [] };
         let activeProfileIndex = 0;
+        let myProfileId = roomID ? sessionStorage.getItem('my_identity_' + roomID) : null;
 
         // 用來區分是不是自己發送的訊息
         const myClientID = 'client_' + Math.random().toString(16).substr(2, 8);
@@ -427,7 +551,7 @@
         // 檢查 URL 狀態
         if (roomID) {
             document.getElementById('welcomeView').style.display = 'none';
-            document.getElementById('appView').style.display = 'block';
+            document.getElementById('loaderView').style.display = 'block';
             initMqttSync();
         }
 
@@ -482,22 +606,29 @@
                         if (serverData.updatedAt > localData.updatedAt) {
                             localData = serverData;
                             localStorage.setItem('collab_book_' + roomID, JSON.stringify(localData));
-                            render();
-                            triggerSyncAnim();
+                            if (document.getElementById('identityView').style.display === 'flex') {
+                                renderIdentityChoices();
+                            } else if (document.getElementById('appView').style.display === 'block') {
+                                render();
+                                triggerSyncAnim();
+                            }
                         }
                     } catch (e) { console.error('Data parsing error', e); }
                 }
             });
 
-            // 如果本地還是空的，加入預設
+            // 等待一點時間抓取網路資料後，顯示身分選擇或主畫面
             setTimeout(() => {
-                if (localData.profiles.length === 0) {
-                    addProfile('😎 我自己');
+                document.getElementById('loaderView').style.display = 'none';
+                if (myProfileId && localData.profiles.find(p => p.id === myProfileId)) {
+                    document.getElementById('appView').style.display = 'block';
+                    activeProfileIndex = localData.profiles.findIndex(p => p.id === myProfileId);
+                    if (activeProfileIndex === -1) activeProfileIndex = 0;
+                    render();
+                } else {
+                    showIdentitySelection();
                 }
             }, 1000);
-
-            // 如果本地本來就有舊資料，先畫出來
-            render();
         }
 
         // 發送資料變更到全網
@@ -510,6 +641,56 @@
                 triggerSyncAnim();
             }
             render();
+        }
+
+        function showIdentitySelection() {
+            document.getElementById('appView').style.display = 'none';
+            document.getElementById('identityView').style.display = 'flex';
+            renderIdentityChoices();
+        }
+
+        function renderIdentityChoices() {
+            const container = document.getElementById('existingProfiles');
+            container.innerHTML = '';
+            if (localData.profiles.length === 0) {
+                document.getElementById('orTextId').style.display = 'none';
+                return;
+            }
+            document.getElementById('orTextId').style.display = 'block';
+            localData.profiles.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = 'id-btn';
+                btn.textContent = '我是 ' + p.name;
+                btn.onclick = () => { selectIdentity(p.id); };
+                container.appendChild(btn);
+            });
+        }
+
+        function selectIdentity(pid) {
+            myProfileId = pid;
+            sessionStorage.setItem('my_identity_' + roomID, pid);
+            document.getElementById('identityView').style.display = 'none';
+            document.getElementById('appView').style.display = 'block';
+            activeProfileIndex = localData.profiles.findIndex(p => p.id === pid);
+            if (activeProfileIndex === -1) activeProfileIndex = 0;
+            render();
+        }
+
+        function createNewIdentity() {
+            const name = document.getElementById('newIdentityName').value.trim();
+            if (!name) return alert('請輸入您的名稱！');
+
+            const newPid = 'p_' + Date.now();
+            localData.profiles.push({
+                id: newPid,
+                name: name,
+                categories: [
+                    { id: 'c_like', name: '❤️ 喜歡的東西', items: [] },
+                    { id: 'c_hate', name: '⚠️ 絕對地雷', items: [] }
+                ]
+            });
+            pushSync();
+            selectIdentity(newPid);
         }
 
         function triggerSyncAnim() {
