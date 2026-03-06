@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大小事小本本 📒 | 你的求生錄</title>
+    <style>
+        :root {
+            --pink: #FF85A2;
+            --cream: #FFFDF5;
+            --border: #E8E0D5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: var(--cream);
+            color: #4A4A4A;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 450px;
+            background: #FFF;
+            border-radius: 20px;
+            border: 2px solid var(--border);
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            font-size: 22px;
+            color: var(--pink);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+            background: var(--pink);
+            color: #FFF;
+            margin: 5px 0;
+        }
+
+        .entry-list {
+            margin-top: 20px;
+        }
+
+        .entry {
+            background: #FAF9F6;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid #F0EBE0;
+            position: relative;
+        }
+
+        .entry .name {
+            font-weight: 800;
+            color: #333;
+        }
+
+        .entry .tag {
+            font-size: 11px;
+            background: #EEE;
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+
+        .entry .del {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #CCC;
+            cursor: pointer;
+        }
+
+        .game-zone {
+            background: #FFF9F9;
+            border: 2px dashed var(--pink);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app">
+        <h1>📒 大小事小本本</h1>
+        <p style="font-size: 12px; opacity: 0.7; margin-bottom: 20px; text-align: center;">這裡記錄的資料只會存在你的手機裡，不會上傳雲端。</p>
+
+        <div class="input-group">
+            <input type="text" id="targetName" placeholder="誰的名字？ (例: 老婆, 媽, 胖橘)">
+        </div>
+        <div class="input-group">
+            <select id="factType">
+                <option value="❤️ 喜歡">❤️ 喜歡的東西</option>
+                <option value="🚫 忌諱">🚫 討厭/地雷/過敏</option>
+                <option value="📅 紀念日">📅 重要日子</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <input type="text" id="factText" placeholder="具體細節 (例: 奶茶微糖去冰)">
+        </div>
+        <button onclick="addFact()">💾 記進求生小本本</button>
+
+        <div class="entry-list" id="entryList"></div>
+
+        <div class="game-zone" id="gameZone" style="display:none;">
+            <h4 style="margin-bottom: 10px;">🎲 記憶大考驗</h4>
+            <div id="gameText" style="margin-bottom: 10px; font-weight: bold;"></div>
+            <button onclick="playMemory()" style="background: #4A4A4A; font-size: 13px; padding: 8px;">隨機抽測一筆記憶</button>
+        </div>
+
+        <button onclick="exportData()"
+            style="background: transparent; border: 2px solid var(--border); color: #888; font-size: 12px; margin-top: 20px;">📤
+            匯出備份 (JSON)</button>
+    </div>
+
+    <script>
+        let facts = JSON.parse(localStorage.getItem('my_life_book') || '[]');
+
+        function render() {
+            const list = document.getElementById('entryList');
+            list.innerHTML = '';
+            facts.forEach((f, i) => {
+                const div = document.createElement('div');
+                div.className = 'entry';
+                div.innerHTML = `<span class="name">${f.name}</span> <span class="tag">${f.type}</span><div style="margin-top:5px;">${f.text}</div><span class="del" onclick="delFact(${i})">✕</span>`;
+                list.appendChild(div);
+            });
+            localStorage.setItem('my_life_book', JSON.stringify(facts));
+            document.getElementById('gameZone').style.display = facts.length > 2 ? 'block' : 'none';
+        }
+
+        function addFact() {
+            const name = document.getElementById('targetName').value.trim();
+            const type = document.getElementById('factType').value;
+            const text = document.getElementById('factText').value.trim();
+            if (!name || !text) return alert('別偷懶，寫清楚一點！');
+
+            facts.push({ name, type, text });
+            document.getElementById('factText').value = '';
+            render();
+        }
+
+        function delFact(i) { if (confirm('要刪掉這筆記憶嗎？')) { facts.splice(i, 1); render(); } }
+
+        function playMemory() {
+            const f = facts[Math.floor(Math.random() * facts.length)];
+            document.getElementById('gameText').innerHTML = `請問關於『${f.name}』，<br>你記得 ${f.type} 的細節嗎？`;
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(facts));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "求生小本本備份.json");
+            downloadAnchorNode.click();
+        }
+
+        render();
+    </script>
+</body>
+
+</html>
