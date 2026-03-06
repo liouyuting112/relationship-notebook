@@ -251,6 +251,48 @@
             flex: 1;
         }
 
+        .pinned-board {
+            width: 100%;
+            background: #FFF9E6;
+            border: 2px solid var(--pin);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            column-span: all;
+        }
+
+        .pinned-board h3 {
+            color: #B37D00;
+            margin-bottom: 10px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pinned-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pinned-item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #FFF;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px dashed #E5C07B;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .pinned-item-row b {
+            color: #333;
+            margin-right: 5px;
+        }
+
         /* 瀑布流排版 (解決過長問題) */
         .masonry {
             column-count: 1;
@@ -464,7 +506,7 @@
         <div class="notebook-view" id="notebookView" style="display:none;">
             <div class="tabs" id="tabsArea"></div>
             <div class="content-area">
-                <div class="masonry" id="contentArea"></div>
+                <div id="contentArea"></div>
 
                 <button
                     style="width:100%; padding:15px; background:transparent; border:2px dashed #CCC; color:#888; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:20px;"
@@ -688,8 +730,9 @@
 
             localData.profiles.forEach((p, idx) => {
                 const btn = document.createElement('button');
+                const isMe = (p.id === myProfileId) ? ' (我)' : '';
                 btn.className = 'tab-btn' + (idx === activeProfileIndex ? ' active' : '');
-                btn.textContent = p.name;
+                btn.textContent = p.name + isMe;
                 btn.onclick = () => { activeProfileIndex = idx; renderNotebook(); };
                 tArea.appendChild(btn);
             });
@@ -721,6 +764,38 @@
 
             const profile = localData.profiles[activeProfileIndex];
 
+            // 1. 抽取所有釘選的項目顯示在最上方
+            let allPinnedItems = [];
+            profile.categories.forEach((cat, cIdx) => {
+                cat.items.forEach((item, iIdx) => {
+                    if (item.pinned) allPinnedItems.push({ catName: cat.name, text: item.text, cIdx, iIdx });
+                });
+            });
+
+            if (allPinnedItems.length > 0) {
+                const board = document.createElement('div');
+                board.className = 'pinned-board masonry-ignore';
+                board.style.columnSpan = 'all'; // 跨列顯示
+
+                let html = `<h3>📌 總機置頂看板 (重要提醒)</h3><div class="pinned-list">`;
+                allPinnedItems.forEach(pin => {
+                    html += `
+                    <div class="pinned-item-row">
+                        <div><b>${highlightText(pin.catName)}：</b> ${highlightText(pin.text)}</div>
+                        <span class="action-btn" style="cursor:pointer; font-size:12px; opacity:0.6;" onclick="togglePin(${pin.cIdx}, ${pin.iIdx})" title="解除釘選">❌ 解除</span>
+                    </div>
+                `;
+                });
+                html += `</div>`;
+                board.innerHTML = html;
+                area.appendChild(board);
+            }
+
+            // 2. 顯示分類清單 (瀑布流中)
+            // 建立一個容器裝瀑布流分類
+            const masonryDiv = document.createElement('div');
+            masonryDiv.className = 'masonry';
+
             profile.categories.forEach((cat, cIdx) => {
                 // 過濾搜尋
                 let displayItems = cat.items;
@@ -730,7 +805,7 @@
                     if (displayItems.length === 0 && !cat.name.toLowerCase().includes(searchQuery)) return;
                 }
 
-                // 釘選排序 (釘選在前面)
+                // 釘選排序 (釘選在前面) - This sorting is for items *within* the category card
                 displayItems.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
                 const card = document.createElement('div');
@@ -745,6 +820,7 @@
             `;
 
                 displayItems.forEach((item) => {
+                    // 如果已經釘選，在釘選看板出現過，這裡可選擇是否標示，或是直接隱藏。這裡選擇維持原樣但加上已釘選樣式
                     // 找出原始 index 以利修改
                     const iIdx = cat.items.findIndex(x => x.id === item.id);
                     const pinClass = item.pinned ? 'pinned' : '';
@@ -772,8 +848,10 @@
                 `;
                 }
                 card.innerHTML = html;
-                area.appendChild(card);
+                masonryDiv.appendChild(card);
             });
+
+            area.appendChild(masonryDiv);
         }
 
         /* 資料操作 */
