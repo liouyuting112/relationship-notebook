@@ -4,8 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>求生聯絡簿 📒 | 家人與伴侶共編版</title>
-    <!-- MQTT 進行無伺服器即時同步 -->
+    <title>求生聯絡簿 📒 | 終極群組版</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         :root {
@@ -14,6 +13,7 @@
             --border: #E5E5E5;
             --card: #FFFFFF;
             --text: #333;
+            --pin: #FFB300;
         }
 
         * {
@@ -26,13 +26,14 @@
         body {
             background: var(--bg);
             color: var(--text);
-            padding: 20px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
         }
 
+        /* 歡迎首頁 */
         .welcome-view {
             text-align: center;
             max-width: 400px;
@@ -48,50 +49,143 @@
             margin-bottom: 20px;
         }
 
-        .welcome-view p {
-            color: #666;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 30px;
-        }
-
         .btn-main {
             background: var(--pink);
             color: white;
             border: none;
-            padding: 15px 30px;
-            font-size: 18px;
+            padding: 15px;
+            font-size: 16px;
             border-radius: 12px;
             font-weight: bold;
             cursor: pointer;
             transition: 0.2s;
             width: 100%;
             box-shadow: 0 5px 15px rgba(255, 107, 139, 0.3);
+            margin-top: 10px;
         }
 
         .btn-main:active {
             transform: scale(0.95);
         }
 
-        .identity-view {
+        /* 主應用區 */
+        .app-container {
             display: none;
             width: 100%;
-            max-width: 400px;
+            max-width: 800px;
             background: var(--card);
             border-radius: 20px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-            padding: 30px;
+            overflow: hidden;
+            min-height: 80vh;
+            position: relative;
+            border: 1px solid var(--border);
+        }
+
+        /* 頂部導航列 (群組切換) */
+        .top-nav {
+            background: #333;
+            color: white;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .group-selector {
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            padding: 8px 12px;
+            border-radius: 8px;
+            outline: none;
+            font-size: 14px;
+            font-weight: bold;
+            max-width: 150px;
+        }
+
+        .top-nav-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn-small {
+            background: #555;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-small:hover {
+            background: #777;
+        }
+
+        /* 內容標頭 */
+        .header {
+            background: #FFF9FA;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h2 {
+            color: var(--pink);
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            background: #FF9800;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* 搜尋列 */
+        .search-box {
+            display: flex;
+            width: 100%;
+            background: #FFF;
+            border: 1px solid #DDD;
+            border-radius: 12px;
+            padding: 5px 15px;
+            align-items: center;
+        }
+
+        .search-box input {
+            border: none;
+            outline: none;
+            padding: 8px 0;
+            width: 100%;
+            font-size: 14px;
+        }
+
+        .search-box span {
+            color: #AAA;
+        }
+
+        /* 身分認證畫面 */
+        .identity-view {
+            display: none;
+            padding: 40px;
             text-align: center;
             flex-direction: column;
             align-items: center;
-            border: 1px solid var(--border);
-            margin-top: 50px;
-        }
-
-        .identity-view h2 {
-            color: var(--pink);
-            margin-bottom: 20px;
-            font-size: 22px;
         }
 
         .id-btn {
@@ -104,8 +198,8 @@
             cursor: pointer;
             margin: 5px 0;
             font-size: 16px;
-            transition: 0.2s;
             width: 100%;
+            max-width: 300px;
         }
 
         .id-btn:hover {
@@ -113,137 +207,11 @@
             color: #FFF;
         }
 
-        .or-text {
-            margin: 20px 0;
-            color: #AAA;
-            font-size: 14px;
-            position: relative;
-            width: 100%;
-        }
-
-        .or-text::before,
-        .or-text::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            width: 35%;
-            height: 1px;
-            background: #EEE;
-        }
-
-        .or-text::before {
-            left: 0;
-        }
-
-        .or-text::after {
-            right: 0;
-        }
-
-        .create-id-box {
+        /* 筆記本主畫面 */
+        .notebook-view {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            width: 100%;
-        }
-
-        .create-id-box input {
-            padding: 12px;
-            border: 1px solid #DDD;
-            border-radius: 10px;
-            font-size: 15px;
-            outline: none;
-            text-align: center;
-        }
-
-        .create-id-box button {
-            background: #E5E5E5;
-            color: #555;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .create-id-box button:hover {
-            background: var(--pink);
-            color: white;
-        }
-
-        .loader-view {
-            display: none;
-            margin-top: 100px;
-            font-weight: bold;
-            color: #888;
-            font-size: 18px;
-        }
-
-        .app-view {
-            display: none;
-            width: 100%;
-            max-width: 600px;
-            background: var(--card);
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-            min-height: 600px;
-            position: relative;
-            border: 1px solid var(--border);
-        }
-
-        .header {
-            background: #FFF9FA;
-            padding: 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header h2 {
-            color: var(--pink);
-            font-size: 20px;
-        }
-
-        .sync-status {
-            font-size: 12px;
-            color: #888;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .sync-dot {
-            width: 8px;
-            height: 8px;
-            background: #4CAF50;
-            border-radius: 50%;
-            display: inline-block;
-            animation: blink 2s infinite;
-        }
-
-        @keyframes blink {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.4;
-            }
-        }
-
-        .btn-share {
-            background: #FFF;
-            border: 1px solid var(--pink);
-            color: var(--pink);
-            padding: 8px 15px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 12px;
+            flex: 1;
         }
 
         .tabs {
@@ -268,9 +236,7 @@
             font-size: 14px;
             white-space: nowrap;
             cursor: pointer;
-            transition: 0.2s;
             font-weight: bold;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
         }
 
         .tab-btn.active {
@@ -279,41 +245,42 @@
             border-color: var(--pink);
         }
 
-        .tab-btn-add {
-            background: transparent;
-            border: 1px dashed #CCC;
-            color: #888;
-        }
-
         .content-area {
             padding: 20px;
-            background: var(--card);
-            min-height: 400px;
+            background: var(--bg);
+            flex: 1;
         }
 
-        .empty-state {
-            text-align: center;
-            color: #AAA;
-            padding: 50px 20px;
-            font-size: 14px;
+        /* 瀑布流排版 (解決過長問題) */
+        .masonry {
+            column-count: 1;
+            column-gap: 20px;
+        }
+
+        @media (min-width: 600px) {
+            .masonry {
+                column-count: 2;
+            }
         }
 
         .category-card {
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 16px;
             padding: 15px;
             margin-bottom: 20px;
-            background: #FCFCFC;
-            position: relative;
+            background: var(--card);
+            break-inside: avoid;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
         }
 
         .category-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-            border-bottom: 1px dashed #CCC;
+            border-bottom: 1px dashed #E5E5E5;
             padding-bottom: 10px;
+            margin-bottom: 12px;
+            cursor: pointer;
         }
 
         .category-header h3 {
@@ -321,93 +288,79 @@
             color: #444;
         }
 
-        .del-cat {
-            font-size: 18px;
-            color: #CCC;
-            cursor: pointer;
-            line-height: 1;
-            background: none;
-            border: none;
-        }
-
-        .del-cat:hover {
-            color: red;
-        }
-
         .item-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 15px;
         }
 
         .item-tag {
-            background: #FFF0F3;
-            color: #A03B52;
-            padding: 8px 12px;
+            background: #F5F5F7;
+            color: #444;
+            padding: 6px 10px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            border: 1px solid #FFE0E6;
+            gap: 6px;
+            border: 1px solid #E5E5E5;
+            transition: 0.2s;
         }
 
-        .item-tag .del-item {
-            font-size: 12px;
-            cursor: pointer;
-            opacity: 0.6;
+        .item-tag.pinned {
+            border: 1px solid var(--pin);
+            background: #FFF9E6;
+            color: #B37D00;
+            font-weight: bold;
         }
 
-        .item-tag .del-item:hover {
-            opacity: 1;
-            color: red;
+        /* 亮點搜尋關鍵字 */
+        .highlight {
+            background: yellow;
+            color: #000;
         }
 
-        .add-item-box {
+        .tag-actions {
             display: flex;
-            gap: 10px;
+            opacity: 0.5;
+            gap: 5px;
         }
 
-        .add-item-box input {
+        .item-tag:hover .tag-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .action-btn:hover {
+            transform: scale(1.2);
+        }
+
+        .add-box {
+            display: flex;
+            gap: 5px;
+        }
+
+        .add-box input {
             flex: 1;
-            padding: 10px;
+            padding: 8px;
             border: 1px solid #DDD;
             border-radius: 8px;
             outline: none;
+            font-size: 13px;
         }
 
-        .add-item-box button {
+        .add-box button {
             background: #E5E5E5;
             border: none;
-            padding: 0 15px;
+            padding: 0 10px;
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
-            color: #555;
-        }
-
-        .add-item-box button:hover {
-            background: var(--pink);
-            color: white;
-        }
-
-        .add-cat-btn {
-            width: 100%;
-            border: 2px dashed #CCC;
-            background: transparent;
-            color: #888;
-            padding: 15px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
-        .add-cat-btn:hover {
-            border-color: var(--pink);
-            color: var(--pink);
         }
 
         /* Modal */
@@ -457,391 +410,382 @@
             font-weight: bold;
             cursor: pointer;
         }
-
-        .btn-cancel {
-            background: #EEE;
-            color: #555;
-        }
-
-        .btn-confirm {
-            background: var(--pink);
-            color: white;
-        }
     </style>
 </head>
 
 <body>
 
-    <!-- Welcome View -->
+    <!-- 首頁：無群組時顯示 -->
     <div class="welcome-view" id="welcomeView">
-        <h1>📒 求生聯絡簿 V2</h1>
-        <p>這是一個沒有伺服器限制、純靠魔法(加密連線)同步的小本本。<br><br>你可以建立一個專屬房間，把這個網址丟給你的家人、伴侶，大家點開網址就能<b>共同自訂標籤</b>、<b>即時新增彼此的喜好與地雷</b>。
-        </p>
-        <button class="btn-main" onclick="createRoom()">🏠 建立家庭共編空間</button>
+        <h1>📒 求生群組小本本</h1>
+        <p>可以建立無限多個群組 (家人/朋友/情侶)。<br>每個群組網址獨立，你能在上方清單隨時切換，但你分享網址給朋友時，他們只看得到該群組！</p>
+        <button class="btn-main" onclick="openCreateGroupModal()">➕ 建立我的第一個群組</button>
     </div>
 
-    <!-- Loader View -->
-    <div class="loader-view" id="loaderView">
-        🔄 正在同步家庭紀錄...
-    </div>
+    <!-- 主應用區 -->
+    <div class="app-container" id="appView">
 
-    <!-- Identity View -->
-    <div class="identity-view" id="identityView">
-        <h2>這是你的專屬聯絡簿</h2>
-        <p style="color: #666; font-size:14px; margin-bottom: 20px;">請選擇你是誰，或是建立一個自己的新身分：</p>
-        <div id="existingProfiles" style="width: 100%; display: flex; flex-direction: column; gap: 10px;"></div>
-        <div class="or-text" id="orTextId">或是</div>
-        <div class="create-id-box">
-            <input type="text" id="newIdentityName" placeholder="我是... (例如: 老婆、爸爸)">
-            <button onclick="createNewIdentity()">我要建立新身分</button>
-        </div>
-    </div>
-
-    <!-- Main App View -->
-    <div class="app-view" id="appView">
-        <div class="header">
+        <!-- 全局頂部：群組管理 -->
+        <div class="top-nav">
             <div>
-                <h2>📒 求生小本本</h2>
-                <div class="sync-status"><span class="sync-dot" id="syncDot"></span> <span id="syncText">已即時連線</span>
-                </div>
+                <select class="group-selector" id="groupSelector" onchange="switchRoom(this.value)"></select>
             </div>
-            <button class="btn-share" onclick="shareRoom()">🔗 複製共編連結</button>
+            <div class="top-nav-right">
+                <button class="btn-small" onclick="openCreateGroupModal()">+ 開新群組</button>
+                <button class="btn-small" style="background:#4CAF50;" onclick="shareRoom()">🔗 給這群別人</button>
+            </div>
         </div>
 
-        <!-- 頂部頁籤 (人物) -->
-        <div class="tabs" id="tabsArea">
-            <!-- 動態產生 -->
+        <!-- 房間內容 -->
+        <div class="header">
+            <div class="header-top">
+                <h2 id="roomTitle"><span class="sync-dot" id="syncDot"></span> <span id="roomNameLabel">載入中...</span>
+                </h2>
+                <div style="font-size: 12px; color: #888;">本群限制長度：無限</div>
+            </div>
+            <div class="search-box">
+                <span>🔍</span>
+                <input type="text" id="searchInput" placeholder="模糊搜尋：例如打『花生』或『鞋』..." onkeyup="handleSearch()">
+            </div>
         </div>
 
-        <!-- 內容區 (喜好清單) -->
-        <div class="content-area" id="contentArea">
-            <!-- 動態產生 -->
+        <!-- 身分認證層 (如果在此房間沒身分) -->
+        <div class="identity-view" id="identityView">
+            <h3 style="margin-bottom:20px; color:var(--pink);">這個群組裡，你是哪位？</h3>
+            <div id="existingProfiles"
+                style="width: 100%; display: flex; flex-direction: column; gap: 10px; align-items:center;"></div>
+            <div style="margin:20px 0; color:#AAA; font-size:14px;">或</div>
+            <input type="text" id="newIdentityName" placeholder="我是... (例如: 老爸)"
+                style="padding:12px; border:1px solid #CCC; border-radius:10px; text-align:center; width: 100%; max-width:300px; margin-bottom:10px;">
+            <button class="btn-main" style="max-width:300px;" onclick="createNewIdentity()">＋ 建立我的身分</button>
+        </div>
+
+        <!-- 筆記本操作層 -->
+        <div class="notebook-view" id="notebookView" style="display:none;">
+            <div class="tabs" id="tabsArea"></div>
+            <div class="content-area">
+                <div class="masonry" id="contentArea"></div>
+
+                <button
+                    style="width:100%; padding:15px; background:transparent; border:2px dashed #CCC; color:#888; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:20px;"
+                    onclick="openModal('📁 建立新分類', '例如: 手搖杯喜好', 'category')">
+                    ＋ 為他建立新分類板塊
+                </button>
+                <button
+                    style="width:100%; text-align:center; background:none; border:none; color:#CCC; margin-top:30px; cursor:pointer;"
+                    onclick="delProfile()">⛔ 刪除此成員紀錄</button>
+            </div>
         </div>
     </div>
 
-    <!-- Modal 彈窗 -->
+    <!-- 通用輸入 Modal -->
     <div class="modal" id="modal">
         <div class="modal-content">
-            <h3 id="modalTitle">新增資料</h3>
-            <input type="text" id="modalInput" placeholder="請輸入...">
+            <h3 id="modalTitle">輸入</h3>
+            <input type="text" id="modalInput" placeholder="...">
             <div class="modal-btns">
-                <button class="btn-cancel" onclick="closeModal()">取消</button>
-                <button class="btn-confirm" id="modalConfirm">確定</button>
+                <button style="background:#EEE; color:#555;" onclick="closeModal()">取消</button>
+                <button style="background:var(--pink); color:white;" id="modalConfirm">確定</button>
             </div>
         </div>
     </div>
 
     <script>
-        /* =====================
-           1. 系統與同步設定
-           ===================== */
-        // 使用 EMQX 公共 MQTT Broker 進行即時轉發
+        // MQTT & 系統變數
         const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
         let client = null;
-        let roomID = new URLSearchParams(window.location.search).get('room');
-        let localData = { updatedAt: 0, profiles: [] };
+        let myClientID = 'client_' + Math.random().toString(16).substr(2, 8);
+
+        // 多群組管理
+        let savedRooms = JSON.parse(localStorage.getItem('my_saved_rooms_v5') || '[]');
+        let currentRoomId = new URLSearchParams(window.location.search).get('room');
+
+        // 當前房間資料
+        let localData = { name: "未命名群組", updatedAt: 0, profiles: [] };
         let activeProfileIndex = 0;
-        let myProfileId = roomID ? sessionStorage.getItem('my_identity_' + roomID) : null;
+        let myProfileId = null;
+        let searchQuery = "";
 
-        // 用來區分是不是自己發送的訊息
-        const myClientID = 'client_' + Math.random().toString(16).substr(2, 8);
-        const topicSync = 'collab_notebook_v4_' + roomID;
-        const topicReq = 'collab_notebook_req_' + roomID;
+        function initApp() {
+            if (!currentRoomId) {
+                if (savedRooms.length > 0) {
+                    // 如果沒帶網址但有存過，跳轉到最後一個
+                    window.location.href = '?room=' + savedRooms[0].id;
+                } else {
+                    document.getElementById('welcomeView').style.display = 'block';
+                }
+                return;
+            }
 
-        // 檢查 URL 狀態
-        if (roomID) {
             document.getElementById('welcomeView').style.display = 'none';
-            document.getElementById('loaderView').style.display = 'block';
+            document.getElementById('appView').style.display = 'block';
+
+            myProfileId = sessionStorage.getItem('my_id_for_' + currentRoomId);
+
+            // 如果這是新連到的網址，把它存進我的房間清單 (預設名稱)
+            if (!savedRooms.find(r => r.id === currentRoomId)) {
+                savedRooms.unshift({ id: currentRoomId, name: "載入中群組..." });
+                saveRoomsList();
+            }
+
+            renderRoomSelector();
             initMqttSync();
         }
 
-        function createRoom() {
-            const uuid = 'room_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-            window.location.href = '?room=' + uuid;
+        /* 群組切換與建立 */
+        function saveRoomsList() {
+            localStorage.setItem('my_saved_rooms_v5', JSON.stringify(savedRooms));
         }
 
+        function renderRoomSelector() {
+            const sel = document.getElementById('groupSelector');
+            sel.innerHTML = '';
+            savedRooms.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.textContent = r.name || "未命名群組";
+                if (r.id === currentRoomId) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        function switchRoom(roomId) {
+            if (roomId) window.location.href = '?room=' + roomId;
+        }
+
+        let modalAction = '';
+        function openCreateGroupModal() {
+            openModal("🏠 建立新群組", "請輸入群組名稱 (例如：家人群組)", "create_room");
+        }
+
+        /* MQTT 核心 */
         function initMqttSync() {
-            const loadBackup = localStorage.getItem('collab_book_' + roomID);
-            if (loadBackup) {
-                localData = JSON.parse(loadBackup);
+            const backup = localStorage.getItem('r_data_' + currentRoomId);
+            if (backup) {
+                localData = JSON.parse(backup);
+                updateRoomNameInList(localData.name);
             }
 
-            // 顯示目前連線狀態為連線中
-            document.getElementById('syncText').textContent = '連線中...';
+            const topicSync = 'note_v5_' + currentRoomId;
+            const topicReq = 'note_req_v5_' + currentRoomId;
+
             document.getElementById('syncDot').style.background = '#FF9800';
 
             client = mqtt.connect(brokerUrl, {
-                clientId: myClientID,
-                clean: true,
-                connectTimeout: 4000,
-                reconnectPeriod: 1000,
+                clientId: myClientID, clean: true, connectTimeout: 4000
             });
 
             client.on('connect', () => {
-                document.getElementById('syncText').textContent = '已即時連線';
                 document.getElementById('syncDot').style.background = '#4CAF50';
-
-                // 訂閱資料更新頻道與請求頻道
                 client.subscribe(topicSync);
                 client.subscribe(topicReq);
-
-                // 一連線就跟房間裡的人要最新資料
                 client.publish(topicReq, "give_me_data");
             });
 
             client.on('message', (topic, message) => {
-                if (topic === topicReq) {
-                    // 有新用戶請求資料，且我們有資料時，廣播目前資料
-                    if (message.toString() === "give_me_data" && localData.updatedAt > 0) {
-                        client.publish(topicSync, JSON.stringify({ sender: myClientID, data: localData }));
-                    }
+                if (topic === topicReq && message.toString() === "give_me_data" && localData.updatedAt > 0) {
+                    client.publish(topicSync, JSON.stringify({ sender: myClientID, data: localData }));
                 } else if (topic === topicSync) {
                     try {
                         const payload = JSON.parse(message.toString());
-                        // 不要處理自己剛發出去的資料，避免無限迴圈
                         if (payload.sender === myClientID) return;
-
                         const serverData = payload.data;
-                        // 如果伺服器的時間戳大於本地的，則覆蓋本地，並重新渲染UI
                         if (serverData.updatedAt > localData.updatedAt) {
                             localData = serverData;
-                            localStorage.setItem('collab_book_' + roomID, JSON.stringify(localData));
-                            if (document.getElementById('identityView').style.display === 'flex') {
-                                renderIdentityChoices();
-                            } else if (document.getElementById('appView').style.display === 'block') {
-                                render();
-                                triggerSyncAnim();
-                            }
+                            localStorage.setItem('r_data_' + currentRoomId, JSON.stringify(localData));
+                            updateRoomNameInList(localData.name);
+                            verifyIdentityState();
+                            triggerSyncAnim();
                         }
-                    } catch (e) { console.error('Data parsing error', e); }
+                    } catch (e) { }
                 }
             });
 
-            // 等待一點時間抓取網路資料後，顯示身分選擇或主畫面
-            setTimeout(() => {
-                document.getElementById('loaderView').style.display = 'none';
-                if (myProfileId && localData.profiles.find(p => p.id === myProfileId)) {
-                    document.getElementById('appView').style.display = 'block';
-                    activeProfileIndex = localData.profiles.findIndex(p => p.id === myProfileId);
-                    if (activeProfileIndex === -1) activeProfileIndex = 0;
-                    render();
-                } else {
-                    showIdentitySelection();
-                }
-            }, 1000);
+            setTimeout(verifyIdentityState, 800);
         }
 
-        // 發送資料變更到全網
         function pushSync() {
             localData.updatedAt = Date.now();
-            localStorage.setItem('collab_book_' + roomID, JSON.stringify(localData));
+            localStorage.setItem('r_data_' + currentRoomId, JSON.stringify(localData));
             if (client && client.connected) {
-                // 發布更新，讓所有訂閱者看到
-                client.publish(topicSync, JSON.stringify({ sender: myClientID, data: localData }), { retain: true });
+                client.publish('note_v5_' + currentRoomId, JSON.stringify({ sender: myClientID, data: localData }), { retain: true });
                 triggerSyncAnim();
             }
-            render();
+            verifyIdentityState();
         }
 
-        function showIdentitySelection() {
-            document.getElementById('appView').style.display = 'none';
-            document.getElementById('identityView').style.display = 'flex';
-            renderIdentityChoices();
-        }
-
-        function renderIdentityChoices() {
-            const container = document.getElementById('existingProfiles');
-            container.innerHTML = '';
-            if (localData.profiles.length === 0) {
-                document.getElementById('orTextId').style.display = 'none';
-                return;
+        function updateRoomNameInList(name) {
+            document.getElementById('roomNameLabel').textContent = name;
+            let r = savedRooms.find(r => r.id === currentRoomId);
+            if (r && r.name !== name) {
+                r.name = name;
+                saveRoomsList();
+                renderRoomSelector();
             }
-            document.getElementById('orTextId').style.display = 'block';
-            localData.profiles.forEach(p => {
-                const btn = document.createElement('button');
-                btn.className = 'id-btn';
-                btn.textContent = '我是 ' + p.name;
-                btn.onclick = () => { selectIdentity(p.id); };
-                container.appendChild(btn);
-            });
+        }
+
+        function triggerSyncAnim() {
+            const d = document.getElementById('syncDot');
+            d.style.background = '#2196F3';
+            setTimeout(() => d.style.background = '#4CAF50', 500);
+        }
+
+        /* 身分與認證 */
+        function verifyIdentityState() {
+            if (!myProfileId || !localData.profiles.find(p => p.id === myProfileId)) {
+                document.getElementById('identityView').style.display = 'flex';
+                document.getElementById('notebookView').style.display = 'none';
+
+                const cont = document.getElementById('existingProfiles');
+                cont.innerHTML = '';
+                localData.profiles.forEach(p => {
+                    const b = document.createElement('button');
+                    b.className = 'id-btn';
+                    b.textContent = "我是 " + p.name;
+                    b.onclick = () => selectIdentity(p.id);
+                    cont.appendChild(b);
+                });
+            } else {
+                document.getElementById('identityView').style.display = 'none';
+                document.getElementById('notebookView').style.display = 'flex';
+
+                if (activeProfileIndex >= localData.profiles.length) activeProfileIndex = 0;
+                renderNotebook();
+            }
         }
 
         function selectIdentity(pid) {
             myProfileId = pid;
-            sessionStorage.setItem('my_identity_' + roomID, pid);
-            document.getElementById('identityView').style.display = 'none';
-            document.getElementById('appView').style.display = 'block';
+            sessionStorage.setItem('my_id_for_' + currentRoomId, pid);
             activeProfileIndex = localData.profiles.findIndex(p => p.id === pid);
-            if (activeProfileIndex === -1) activeProfileIndex = 0;
-            render();
+            verifyIdentityState();
         }
 
         function createNewIdentity() {
             const name = document.getElementById('newIdentityName').value.trim();
-            if (!name) return alert('請輸入您的名稱！');
-
-            const newPid = 'p_' + Date.now();
+            if (!name) return;
+            const pid = 'p_' + Date.now();
             localData.profiles.push({
-                id: newPid,
-                name: name,
-                categories: [
-                    { id: 'c_like', name: '❤️ 喜歡的東西', items: [] },
-                    { id: 'c_hate', name: '⚠️ 絕對地雷', items: [] }
+                id: pid, name: name, categories: [
+                    { id: 'c_1', name: '❤️ 喜歡的東西', items: [] },
+                    { id: 'c_2', name: '⚠️ 絕對地雷', items: [] }
                 ]
             });
             pushSync();
-            selectIdentity(newPid);
+            selectIdentity(pid);
         }
 
-        function triggerSyncAnim() {
-            const dot = document.getElementById('syncDot');
-            dot.style.background = '#2196F3'; // 變為藍色代表同步中
-            setTimeout(() => dot.style.background = '#4CAF50', 500); // 變回綠色
+        function shareRoom() {
+            navigator.clipboard.writeText(window.location.href);
+            alert('🔗 已複製本群組專屬連結！\n任何人打開都只看得到這個群組的資料。');
         }
 
-        /* =====================
-           2. UI 渲染實作
-           ===================== */
-        function render() {
-            renderTabs();
-            renderContent();
-        }
-
-        function renderTabs() {
-            const tabsArea = document.getElementById('tabsArea');
-            tabsArea.innerHTML = '';
-
-            if (localData.profiles.length > 0 && activeProfileIndex >= localData.profiles.length) {
-                activeProfileIndex = 0;
-            }
+        /* 筆記本繪製 */
+        function renderNotebook() {
+            const tArea = document.getElementById('tabsArea');
+            tArea.innerHTML = '';
+            if (localData.profiles.length === 0) return;
 
             localData.profiles.forEach((p, idx) => {
                 const btn = document.createElement('button');
                 btn.className = 'tab-btn' + (idx === activeProfileIndex ? ' active' : '');
                 btn.textContent = p.name;
-                btn.onclick = () => { activeProfileIndex = idx; render(); };
-                tabsArea.appendChild(btn);
+                btn.onclick = () => { activeProfileIndex = idx; renderNotebook(); };
+                tArea.appendChild(btn);
             });
 
-            const addBtn = document.createElement('button');
-            addBtn.className = 'tab-btn tab-btn-add';
-            addBtn.textContent = '＋ 新增此家庭成員';
-            addBtn.onclick = () => openModal('👤 建立家庭新成員身分', '例如：老婆、兒子、小美', (val) => addProfile(val));
-            tabsArea.appendChild(addBtn);
+            const addB = document.createElement('button');
+            addB.className = 'tab-btn'; addB.style.background = "transparent"; addB.style.borderStyle = "dashed";
+            addB.textContent = '＋ 新增別人';
+            addB.onclick = () => openModal("👤 新增其他成員", "他的稱呼", "add_member");
+            tArea.appendChild(addB);
+
+            renderContentArea();
         }
 
-        function renderContent() {
+        function handleSearch() {
+            searchQuery = document.getElementById('searchInput').value.trim().toLowerCase();
+            renderContentArea();
+        }
+
+        function highlightText(text) {
+            if (!searchQuery) return text;
+            const regex = new RegExp(`(${searchQuery})`, 'gi');
+            return text.replace(regex, '<span class="highlight">$1</span>');
+        }
+
+        function renderContentArea() {
             const area = document.getElementById('contentArea');
             area.innerHTML = '';
-
-            if (localData.profiles.length === 0) {
-                area.innerHTML = '<div class="empty-state">尚無成員，請先新增家庭成員。</div>';
-                return;
-            }
+            if (localData.profiles.length === 0) return;
 
             const profile = localData.profiles[activeProfileIndex];
 
-            // 分類清單
             profile.categories.forEach((cat, cIdx) => {
+                // 過濾搜尋
+                let displayItems = cat.items;
+                if (searchQuery) {
+                    displayItems = cat.items.filter(i => i.text.toLowerCase().includes(searchQuery));
+                    // 若此分類搜尋不到東西且分類名也沒中，可折疊或隱藏 (這裡選擇如果都沒中就隱藏該分類，讓畫面乾淨)
+                    if (displayItems.length === 0 && !cat.name.toLowerCase().includes(searchQuery)) return;
+                }
+
+                // 釘選排序 (釘選在前面)
+                displayItems.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
                 const card = document.createElement('div');
                 card.className = 'category-card';
 
-                // 卡片標頭
                 let html = `
                 <div class="category-header">
-                    <h3>📁 ${cat.name}</h3>
-                    <button class="del-cat" onclick="delCategory(${cIdx})">✕</button>
+                    <h3>📁 ${highlightText(cat.name)}</h3>
+                    <span style="color:#CCC; cursor:pointer;" onclick="delCategory(${cIdx})">✕</span>
                 </div>
                 <div class="item-list">
             `;
 
-                // 項目標籤
-                cat.items.forEach((item, iIdx) => {
+                displayItems.forEach((item) => {
+                    // 找出原始 index 以利修改
+                    const iIdx = cat.items.findIndex(x => x.id === item.id);
+                    const pinClass = item.pinned ? 'pinned' : '';
+                    const pinIcon = item.pinned ? '📍' : '📌';
+
                     html += `
-                    <div class="item-tag">
-                        <span>${item}</span>
-                        <span class="del-item" onclick="delItem(${cIdx}, ${iIdx})">✕</span>
+                    <div class="item-tag ${pinClass}">
+                        <span>${highlightText(item.text)}</span>
+                        <div class="tag-actions">
+                            <span class="action-btn" onclick="togglePin(${cIdx}, ${iIdx})" title="釘選/解釘">${pinIcon}</span>
+                            <span class="action-btn" style="color:red;" onclick="delItem(${cIdx}, ${iIdx})">✕</span>
+                        </div>
                     </div>
                 `;
                 });
+
                 html += `</div>`;
 
-                // 新增項目輸入框
-                html += `
-                <div class="add-item-box">
-                    <input type="text" id="ipt_${cIdx}" placeholder="新增${cat.name}的項目" onkeydown="if(event.key==='Enter') pushItem(${cIdx})">
-                    <button onclick="pushItem(${cIdx})">加入</button>
-                </div>
-            `;
-
+                if (!searchQuery) { // 搜尋狀態下不顯示輸入框，避免 UI 混亂
+                    html += `
+                    <div class="add-box">
+                        <input type="text" id="ipt_${cIdx}" placeholder="新增項目..." onkeydown="if(event.key==='Enter') pushItem(${cIdx})">
+                        <button onclick="pushItem(${cIdx})">加入</button>
+                    </div>
+                `;
+                }
                 card.innerHTML = html;
                 area.appendChild(card);
             });
-
-            // 最底部的「新增自訂分類」按鈕
-            const addCatBtn = document.createElement('button');
-            addCatBtn.className = 'add-cat-btn';
-            addCatBtn.textContent = '＋ 建立新分類 (例如：飲料喜好、地雷禁區、鞋子尺寸)';
-            addCatBtn.onclick = () => openModal('📁 建立他的專屬新分類標籤', '例如：愛吃的東西', (val) => addCategory(val));
-
-            // 若該成員有資料，加入刪除成員的選項
-            const delMemberBtn = document.createElement('button');
-            delMemberBtn.textContent = '⛔ 刪除此成員所有紀錄';
-            delMemberBtn.style = 'background: transparent; border: none; color: #CCC; font-size:12px; cursor: pointer; text-decoration: underline; display: block; text-align: center; width: 100%; margin-top: 25px;';
-            delMemberBtn.onclick = () => delProfile(activeProfileIndex);
-
-            area.appendChild(addCatBtn);
-            area.appendChild(delMemberBtn);
         }
 
-        /* =====================
-           3. 資料操作邏輯
-           ===================== */
-        function addProfile(name) {
-            if (!name.trim()) return;
-            localData.profiles.push({
-                id: 'p_' + Date.now(),
-                name: name.trim(),
-                categories: [
-                    { id: 'c_like', name: '❤️ 喜歡的東西', items: [] },
-                    { id: 'c_hate', name: '⚠️ 絕對地雷', items: [] }
-                ]
-            });
-            activeProfileIndex = localData.profiles.length - 1;
-            pushSync();
-        }
-
-        function delProfile(pIdx) {
-            if (confirm('確定要刪除整個成員紀錄嗎？(擁有連結的其他人也會同步被刪除喔)')) {
-                localData.profiles.splice(pIdx, 1);
-                activeProfileIndex = 0;
-                pushSync();
-            }
-        }
-
-        function addCategory(name) {
-            if (!name.trim()) return;
-            const profile = localData.profiles[activeProfileIndex];
-            profile.categories.push({
-                id: 'c_' + Date.now(),
-                name: name.trim(),
-                items: []
-            });
-            pushSync();
-        }
-
-        function delCategory(cIdx) {
-            if (confirm('確定刪除此分類？')) {
-                localData.profiles[activeProfileIndex].categories.splice(cIdx, 1);
-                pushSync();
-            }
-        }
-
+        /* 資料操作 */
         window.pushItem = function (cIdx) {
             const ipt = document.getElementById('ipt_' + cIdx);
-            const val = ipt.value.trim();
-            if (!val) return;
-            localData.profiles[activeProfileIndex].categories[cIdx].items.push(val);
+            if (!ipt.value.trim()) return;
+            localData.profiles[activeProfileIndex].categories[cIdx].items.push({
+                id: 'i_' + Date.now(),
+                text: ipt.value.trim(),
+                pinned: false
+            });
+            ipt.value = '';
             pushSync();
         };
 
@@ -850,42 +794,77 @@
             pushSync();
         };
 
-        function shareRoom() {
-            const url = window.location.href;
-            navigator.clipboard.writeText(url).then(() => {
-                alert('🔗 已複製您的共同編輯專屬連結！\n\n只要將連結傳給你的家人或伴侶，他們用手機打開，就能看見並且「即時同步」編輯彼此的紀錄！');
-            });
+        window.togglePin = function (cIdx, iIdx) {
+            const it = localData.profiles[activeProfileIndex].categories[cIdx].items[iIdx];
+            it.pinned = !it.pinned;
+            pushSync();
+        };
+
+        window.delCategory = function (cIdx) {
+            if (confirm("確定刪除此分類？")) {
+                localData.profiles[activeProfileIndex].categories.splice(cIdx, 1);
+                pushSync();
+            }
         }
 
-        /* =====================
-           4. Modal 彈窗小工具
-           ===================== */
-        let modalCallback = null;
-        function openModal(title, placeholder, callback) {
+        window.delProfile = function () {
+            if (confirm("確定刪除這位成員嗎？")) {
+                localData.profiles.splice(activeProfileIndex, 1);
+                activeProfileIndex = 0;
+                pushSync();
+            }
+        }
+
+        /* Modal 邏輯 */
+        function openModal(title, placeholder, action) {
             document.getElementById('modalTitle').textContent = title;
-            const ipt = document.getElementById('modalInput');
-            ipt.placeholder = placeholder;
-            ipt.value = '';
-            modalCallback = callback;
+            const i = document.getElementById('modalInput');
+            i.placeholder = placeholder;
+            i.value = '';
+            modalAction = action;
             document.getElementById('modal').style.display = 'flex';
-            setTimeout(() => ipt.focus(), 100);
-
-            // 綁定鍵盤送出
-            ipt.onkeydown = (e) => { if (e.key === 'Enter') confirmModal(); };
-
-            document.getElementById('modalConfirm').onclick = confirmModal;
+            setTimeout(() => i.focus(), 100);
+            i.onkeydown = (e) => { if (e.key === 'Enter') exeModal(); };
+            document.getElementById('modalConfirm').onclick = exeModal;
         }
 
-        function confirmModal() {
-            const val = document.getElementById('modalInput').value;
-            if (modalCallback) modalCallback(val);
+        function exeModal() {
+            const val = document.getElementById('modalInput').value.trim();
+            if (!val) return;
+
+            if (modalAction === 'create_room') {
+                const uuid = 'room_' + Math.random().toString(36).substr(2, 9);
+                // 寫入初步群組名稱資料與清空框架
+                const newRoomData = { name: val, updatedAt: Date.now(), profiles: [] };
+                localStorage.setItem('r_data_' + uuid, JSON.stringify(newRoomData));
+
+                savedRooms.unshift({ id: uuid, name: val });
+                saveRoomsList();
+                window.location.href = '?room=' + uuid;
+            }
+            else if (modalAction === 'add_member') {
+                localData.profiles.push({
+                    id: 'p_' + Date.now(), name: val, categories: [
+                        { id: 'c_1', name: '❤️ 喜歡', items: [] }, { id: 'c_2', name: '⚠️ 地雷', items: [] }
+                    ]
+                });
+                activeProfileIndex = localData.profiles.length - 1;
+                pushSync();
+            }
+            else if (modalAction === 'category') {
+                localData.profiles[activeProfileIndex].categories.push({
+                    id: 'c_' + Date.now(), name: val, items: []
+                });
+                pushSync();
+            }
             closeModal();
         }
 
         function closeModal() {
             document.getElementById('modal').style.display = 'none';
-            modalCallback = null;
         }
+
+        initApp();
     </script>
 </body>
 
