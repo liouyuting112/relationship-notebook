@@ -214,6 +214,38 @@
             flex: 1;
         }
 
+        .search-results-title {
+            padding: 10px 20px;
+            color: #888;
+            font-size: 14px;
+            border-bottom: 1px solid #EEE;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .result-item {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .result-item .meta {
+            font-size: 11px;
+            color: var(--pink);
+            font-weight: bold;
+            opacity: 0.8;
+        }
+
+        .result-item .path {
+            color: #888;
+            margin-right: 5px;
+        }
+
         .tabs {
             display: flex;
             overflow-x: auto;
@@ -844,64 +876,77 @@
             area.innerHTML = '';
             if (localData.profiles.length === 0) return;
 
-            const profile = localData.profiles[activeProfileIndex];
+            // 如果有搜尋字串，進入「全域搜尋模式」
+            if (searchQuery) {
+                const resultsArea = document.createElement('div');
+                resultsArea.style.padding = '0 5px';
 
-            // 2. 顯示分類清單 (瀑布流中)
-            // 建立一個容器裝瀑布流分類
+                let foundAny = false;
+                const title = document.createElement('div');
+                title.className = 'search-results-title';
+                title.textContent = `🔍 全域搜尋結果： 『${searchQuery}』`;
+                resultsArea.appendChild(title);
+
+                localData.profiles.forEach(p => {
+                    p.categories.forEach(cat => {
+                        const items = cat.items.filter(i => i.text.toLowerCase().includes(searchQuery) || cat.name.toLowerCase().includes(searchQuery));
+                        items.forEach(item => {
+                            foundAny = true;
+                            const div = document.createElement('div');
+                            div.className = 'result-item';
+                            div.innerHTML = `
+                                <div class="meta"><span class="path">${p.name} > ${cat.name}</span></div>
+                                <div style="font-size: 15px;">${highlightText(item.text)}</div>
+                            `;
+                            resultsArea.appendChild(div);
+                        });
+                    });
+                });
+
+                if (!foundAny) {
+                    resultsArea.innerHTML = `<div style="text-align:center; padding:50px; color:#AAA;">找不到相關紀錄... 試試別的關鍵字？</div>`;
+                }
+                area.appendChild(resultsArea);
+                return;
+            }
+
+            // 正常模式：顯示目前選中的 profile 分類 (瀑布流)
+            const profile = localData.profiles[activeProfileIndex];
             const masonryDiv = document.createElement('div');
             masonryDiv.className = 'masonry';
 
             profile.categories.forEach((cat, cIdx) => {
-                // 過濾搜尋
-                let displayItems = cat.items;
-                if (searchQuery) {
-                    displayItems = cat.items.filter(i => i.text.toLowerCase().includes(searchQuery));
-                    // 若此分類搜尋不到東西且分類名也沒中，可折疊或隱藏 (這裡選擇如果都沒中就隱藏該分類，讓畫面乾淨)
-                    if (displayItems.length === 0 && !cat.name.toLowerCase().includes(searchQuery)) return;
-                }
-
-                // 釘選排序 (釘選在前面) - This sorting is for items *within* the category card
-                displayItems.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-
                 const card = document.createElement('div');
                 card.className = 'category-card';
 
                 let html = `
                 <div class="category-header">
-                    <h3>📁 ${highlightText(cat.name)}</h3>
+                    <h3>📁 ${cat.name}</h3>
                     <span style="color:#CCC; cursor:pointer;" onclick="delCategory(${cIdx})">✕</span>
                 </div>
                 <div class="item-list">
-            `;
+                `;
 
-                displayItems.forEach((item) => {
-                    // 如果已經釘選，在釘選看板出現過，這裡可選擇是否標示，或是直接隱藏。這裡選擇維持原樣但加上已釘選樣式
-                    // 找出原始 index 以利修改
-                    const iIdx = cat.items.findIndex(x => x.id === item.id);
+                cat.items.forEach((item, iIdx) => {
                     const pinClass = item.pinned ? 'pinned' : '';
                     const pinIcon = item.pinned ? '📍' : '📌';
-
                     html += `
-                    <div class="item-tag ${pinClass}">
-                        <span>${highlightText(item.text)}</span>
-                        <div class="tag-actions">
-                            <span class="action-btn" onclick="togglePin(${cIdx}, ${iIdx})" title="釘選/解釘">${pinIcon}</span>
-                            <span class="action-btn" style="color:red;" onclick="delItem(${cIdx}, ${iIdx})">✕</span>
+                        <div class="item-tag ${pinClass}">
+                            <span>${item.text}</span>
+                            <div class="tag-actions">
+                                <span class="action-btn" onclick="togglePin(${cIdx}, ${iIdx})" title="釘選/解釘">${pinIcon}</span>
+                                <span class="action-btn" style="color:red;" onclick="delItem(${cIdx}, ${iIdx})">✕</span>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
                 });
 
-                html += `</div>`;
-
-                if (!searchQuery) { // 搜尋狀態下不顯示輸入框，避免 UI 混亂
-                    html += `
+                html += `</div>
                     <div class="add-box">
                         <input type="text" id="ipt_${cIdx}" placeholder="新增項目..." onkeydown="if(event.key==='Enter') pushItem(${cIdx})">
                         <button onclick="pushItem(${cIdx})">加入</button>
-                    </div>
-                `;
-                }
+                    </div>`;
+
                 card.innerHTML = html;
                 masonryDiv.appendChild(card);
             });
