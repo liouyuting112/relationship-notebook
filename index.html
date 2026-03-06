@@ -283,73 +283,105 @@
             flex: 1;
         }
 
-        .pinned-board {
-            width: 100%;
-            background: #FFF9E6;
+        /* 個人釘選摘要卡 */
+        .pinned-summary {
+            background: linear-gradient(135deg, #FFF9E6, #FFF5D6);
             border: 2px solid var(--pin);
-            border-radius: 12px;
-            padding: 15px;
+            border-radius: 14px;
+            padding: 15px 18px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(255, 179, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(255, 179, 0, 0.12);
         }
 
-        .pinned-board h3 {
+        .pinned-summary h4 {
             color: #B37D00;
-            margin-bottom: 15px;
-            font-size: 16px;
+            margin-bottom: 12px;
+            font-size: 15px;
             display: flex;
             align-items: center;
             gap: 8px;
-            border-bottom: 1px solid rgba(179, 125, 0, 0.1);
+            border-bottom: 1px solid rgba(179, 125, 0, 0.15);
             padding-bottom: 8px;
         }
 
-        .pinned-list {
+        .pinned-summary-row {
             display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .pinned-item-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #FFF;
-            padding: 10px 15px;
-            border-radius: 10px;
-            border: 1px dashed #E5C07B;
+            align-items: baseline;
+            gap: 6px;
+            padding: 6px 0;
             font-size: 14px;
             color: #555;
-            transition: 0.2s;
+            border-bottom: 1px dotted #F0E0B0;
         }
 
-        .pinned-item-row:hover {
-            background: #FFFBEE;
+        .pinned-summary-row:last-child {
+            border-bottom: none;
         }
 
-        .pinned-item-row b {
-            color: #333;
-            margin-right: 5px;
-        }
-
-        .pinned-item-row .member-tag {
-            background: #B37D00;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            margin-right: 8px;
+        .pinned-summary-row .cat-label {
             font-weight: bold;
+            color: #8B6B00;
+            white-space: nowrap;
         }
 
+        .pinned-summary-row .cat-items {
+            color: #555;
+        }
+
+        /* 共同 Tab 樣式 */
+        .tab-btn.shared-tab {
+            background: linear-gradient(135deg, #FFF8E1, #FFE082);
+            border: 2px solid #FFB300;
+            color: #8D6E00;
+        }
+
+        .tab-btn.shared-tab.active {
+            background: linear-gradient(135deg, #FFB300, #FF8F00);
+            color: white;
+            border-color: #FF8F00;
+            box-shadow: 0 3px 12px rgba(255, 143, 0, 0.3);
+        }
+
+        .shared-header-banner {
+            background: linear-gradient(135deg, #FFF8E1, #FFECB3);
+            border: 1px solid #FFD54F;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #8D6E00;
+            font-size: 14px;
+        }
+
+        /* 我的 Tab 加強 */
         .tab-btn.is-me {
-            border: 2px solid var(--pink);
+            border: 2.5px solid var(--pink);
             color: var(--pink);
+            position: relative;
+            font-weight: 800;
+        }
+
+        .tab-btn.is-me::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 6px;
+            background: var(--pink);
+            border-radius: 50%;
         }
 
         .tab-btn.is-me.active {
-            background: var(--pink);
+            background: linear-gradient(135deg, #FF6B8B, #FF4B6B);
             color: white;
+            border-color: #FF4B6B;
+            box-shadow: 0 3px 12px rgba(255, 107, 139, 0.3);
+        }
+
+        .tab-btn.is-me.active::after {
+            background: white;
         }
 
         /* 瀑布流排版 (解決過長問題) */
@@ -563,19 +595,10 @@
 
         <!-- 筆記本操作層 -->
         <div class="notebook-view" id="notebookView" style="display:none;">
-            <div id="globalPinnedArea" style="padding: 20px 20px 0 20px;"></div>
             <div class="tabs" id="tabsArea"></div>
             <div class="content-area">
                 <div id="contentArea"></div>
-
-                <button
-                    style="width:100%; padding:15px; background:transparent; border:2px dashed #CCC; color:#888; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:20px;"
-                    onclick="openModal('📁 建立新分類', '例如: 手搖杯喜好', 'category')">
-                    ＋ 為他建立新分類板塊
-                </button>
-                <button
-                    style="width:100%; text-align:center; background:none; border:none; color:#CCC; margin-top:30px; cursor:pointer;"
-                    onclick="delProfile()">⛔ 刪除此成員紀錄</button>
+                <div id="actionButtons"></div>
             </div>
         </div>
     </div>
@@ -603,10 +626,22 @@
         let currentRoomId = new URLSearchParams(window.location.search).get('room');
 
         // 當前房間資料
-        let localData = { name: "未命名群組", updatedAt: 0, profiles: [] };
-        let activeProfileIndex = 0;
+        let localData = { name: "未命名群組", updatedAt: 0, profiles: [], shared: null };
+        let activeProfileIndex = 0; // -1 = 共同 tab
         let myProfileId = null;
         let searchQuery = "";
+
+        function ensureSharedData() {
+            if (!localData.shared) {
+                localData.shared = {
+                    categories: [
+                        { id: 'sc_1', name: '🎉 紀念日', items: [] },
+                        { id: 'sc_2', name: '❤️ 共同喜好', items: [] },
+                        { id: 'sc_3', name: '📋 共同備註', items: [] }
+                    ]
+                };
+            }
+        }
 
         function initApp() {
             if (!currentRoomId) {
@@ -784,10 +819,18 @@
 
         /* 筆記本繪製 */
         function renderNotebook() {
+            ensureSharedData();
             const tArea = document.getElementById('tabsArea');
             tArea.innerHTML = '';
-            if (localData.profiles.length === 0) return;
 
+            // 🌟 共同 Tab
+            const sharedBtn = document.createElement('button');
+            sharedBtn.className = 'tab-btn shared-tab' + (activeProfileIndex === -1 ? ' active' : '');
+            sharedBtn.textContent = '🌟 共同';
+            sharedBtn.onclick = () => { activeProfileIndex = -1; renderNotebook(); };
+            tArea.appendChild(sharedBtn);
+
+            // 個人 Tabs
             localData.profiles.forEach((p, idx) => {
                 const btn = document.createElement('button');
                 const isMe = (p.id === myProfileId);
@@ -796,8 +839,6 @@
                 btn.onclick = () => { activeProfileIndex = idx; renderNotebook(); };
                 tArea.appendChild(btn);
             });
-
-            renderGlobalPinnedBoard();
 
             const addB = document.createElement('button');
             addB.className = 'tab-btn'; addB.style.background = "transparent"; addB.style.borderStyle = "dashed";
@@ -808,57 +849,31 @@
             renderContentArea();
         }
 
-        function renderGlobalPinnedBoard() {
-            const area = document.getElementById('globalPinnedArea');
-            area.innerHTML = '';
-
-            let allPinned = [];
-            localData.profiles.forEach((p, pIdx) => {
-                p.categories.forEach((cat, cIdx) => {
-                    cat.items.forEach((item, iIdx) => {
-                        if (item.pinned) {
-                            allPinned.push({
-                                pName: p.name,
-                                cName: cat.name,
-                                text: item.text,
-                                pIdx, cIdx, iIdx
-                            });
-                        }
-                    });
-                });
+        function renderPersonalPinnedSummary(profile) {
+            // 收集此人所有釘選項目，按分類分組
+            const grouped = {};
+            profile.categories.forEach(cat => {
+                const pinned = cat.items.filter(item => item.pinned);
+                if (pinned.length > 0) {
+                    grouped[cat.name] = pinned.map(p => p.text);
+                }
             });
 
-            if (allPinned.length === 0) {
-                area.style.display = 'none';
-                return;
-            }
-            area.style.display = 'block';
+            if (Object.keys(grouped).length === 0) return '';
 
-            const board = document.createElement('div');
-            board.className = 'pinned-board';
-            let html = `<h3>📌 全家/群組 總機置頂 (重要提醒)</h3><div class="pinned-list">`;
+            const isMe = profile.id === myProfileId;
+            const title = isMe ? '📌 我的重點摘要' : `📌 ${profile.name} 的重點摘要`;
 
-            allPinned.forEach(pin => {
-                html += `
-                    <div class="pinned-item-row">
-                        <div>
-                            <span class="member-tag">${pin.pName}</span>
-                            <b>${highlightText(pin.cName)}：</b> ${highlightText(pin.text)}
-                        </div>
-                        <span class="action-btn" style="cursor:pointer; font-size:12px; color:#AAA;" onclick="togglePinFromGlobal(${pin.pIdx}, ${pin.cIdx}, ${pin.iIdx})" title="解除釘選">❌ 解除</span>
-                    </div>
-                `;
+            let html = `<div class="pinned-summary"><h4>${title}</h4>`;
+            Object.entries(grouped).forEach(([catName, items]) => {
+                html += `<div class="pinned-summary-row">
+                    <span class="cat-label">${catName}：</span>
+                    <span class="cat-items">${items.join('、')}</span>
+                </div>`;
             });
             html += `</div>`;
-            board.innerHTML = html;
-            area.appendChild(board);
+            return html;
         }
-
-        window.togglePinFromGlobal = function (pIdx, cIdx, iIdx) {
-            const it = localData.profiles[pIdx].categories[cIdx].items[iIdx];
-            it.pinned = !it.pinned;
-            pushSync();
-        };
 
         function handleSearch() {
             searchQuery = document.getElementById('searchInput').value.trim().toLowerCase();
@@ -873,8 +888,9 @@
 
         function renderContentArea() {
             const area = document.getElementById('contentArea');
+            const actionArea = document.getElementById('actionButtons');
             area.innerHTML = '';
-            if (localData.profiles.length === 0) return;
+            actionArea.innerHTML = '';
 
             // 如果有搜尋字串，進入「全域搜尋模式」
             if (searchQuery) {
@@ -887,6 +903,7 @@
                 title.textContent = `🔍 全域搜尋結果： 『${searchQuery}』`;
                 resultsArea.appendChild(title);
 
+                // 搜尋個人資料
                 localData.profiles.forEach(p => {
                     p.categories.forEach(cat => {
                         const items = cat.items.filter(i => i.text.toLowerCase().includes(searchQuery) || cat.name.toLowerCase().includes(searchQuery));
@@ -903,6 +920,22 @@
                     });
                 });
 
+                // 搜尋共同資料
+                ensureSharedData();
+                localData.shared.categories.forEach(cat => {
+                    const items = cat.items.filter(i => i.text.toLowerCase().includes(searchQuery) || cat.name.toLowerCase().includes(searchQuery));
+                    items.forEach(item => {
+                        foundAny = true;
+                        const div = document.createElement('div');
+                        div.className = 'result-item';
+                        div.innerHTML = `
+                            <div class="meta"><span class="path">🌟 共同 > ${cat.name}</span></div>
+                            <div style="font-size: 15px;">${highlightText(item.text)}</div>
+                        `;
+                        resultsArea.appendChild(div);
+                    });
+                });
+
                 if (!foundAny) {
                     resultsArea.innerHTML = `<div style="text-align:center; padding:50px; color:#AAA;">找不到相關紀錄... 試試別的關鍵字？</div>`;
                 }
@@ -910,8 +943,69 @@
                 return;
             }
 
-            // 正常模式：顯示目前選中的 profile 分類 (瀑布流)
+            // === 共同 Tab ===
+            if (activeProfileIndex === -1) {
+                ensureSharedData();
+                const banner = document.createElement('div');
+                banner.className = 'shared-header-banner';
+                banner.innerHTML = '🌟 這裡紀錄<b>大家共有的事物</b>，每個人都可以編輯！';
+                area.appendChild(banner);
+
+                const masonryDiv = document.createElement('div');
+                masonryDiv.className = 'masonry';
+
+                localData.shared.categories.forEach((cat, cIdx) => {
+                    const card = document.createElement('div');
+                    card.className = 'category-card';
+                    let html = `
+                    <div class="category-header">
+                        <h3>📁 ${cat.name}</h3>
+                        <span style="color:#CCC; cursor:pointer;" onclick="delSharedCategory(${cIdx})">✕</span>
+                    </div>
+                    <div class="item-list">`;
+
+                    cat.items.forEach((item, iIdx) => {
+                        html += `
+                            <div class="item-tag">
+                                <span>${item.text}</span>
+                                <div class="tag-actions">
+                                    <span class="action-btn" style="color:red;" onclick="delSharedItem(${cIdx}, ${iIdx})">✕</span>
+                                </div>
+                            </div>`;
+                    });
+
+                    html += `</div>
+                        <div class="add-box">
+                            <input type="text" id="sipt_${cIdx}" placeholder="新增項目..." onkeydown="if(event.key==='Enter') pushSharedItem(${cIdx})">
+                            <button onclick="pushSharedItem(${cIdx})">加入</button>
+                        </div>`;
+                    card.innerHTML = html;
+                    masonryDiv.appendChild(card);
+                });
+                area.appendChild(masonryDiv);
+
+                // 共同頁底部按鈕
+                actionArea.innerHTML = `
+                    <button style="width:100%; padding:15px; background:transparent; border:2px dashed #FFB300; color:#B37D00; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:20px;"
+                        onclick="openModal('📁 建立新共同分類', '例如: 家庭旅行計畫', 'shared_category')">
+                        ＋ 新增共同分類
+                    </button>`;
+                return;
+            }
+
+            // === 個人 Tab ===
+            if (localData.profiles.length === 0) return;
             const profile = localData.profiles[activeProfileIndex];
+            if (!profile) return;
+
+            const isMe = profile.id === myProfileId;
+
+            // 個人釘選摘要卡
+            const summaryHtml = renderPersonalPinnedSummary(profile);
+            if (summaryHtml) {
+                area.insertAdjacentHTML('beforeend', summaryHtml);
+            }
+
             const masonryDiv = document.createElement('div');
             masonryDiv.className = 'masonry';
 
@@ -924,8 +1018,7 @@
                     <h3>📁 ${cat.name}</h3>
                     <span style="color:#CCC; cursor:pointer;" onclick="delCategory(${cIdx})">✕</span>
                 </div>
-                <div class="item-list">
-                `;
+                <div class="item-list">`;
 
                 cat.items.forEach((item, iIdx) => {
                     const pinClass = item.pinned ? 'pinned' : '';
@@ -937,8 +1030,7 @@
                                 <span class="action-btn" onclick="togglePin(${cIdx}, ${iIdx})" title="釘選/解釘">${pinIcon}</span>
                                 <span class="action-btn" style="color:red;" onclick="delItem(${cIdx}, ${iIdx})">✕</span>
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 });
 
                 html += `</div>
@@ -950,8 +1042,19 @@
                 card.innerHTML = html;
                 masonryDiv.appendChild(card);
             });
-
             area.appendChild(masonryDiv);
+
+            // 個人頁底部按鈕：動態判斷「我」或「他」
+            const meLabel = isMe ? '我' : '他';
+            actionArea.innerHTML = `
+                <button
+                    style="width:100%; padding:15px; background:transparent; border:2px dashed #CCC; color:#888; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:20px;"
+                    onclick="openModal('📁 建立新分類', '例如: 手搖杯喜好', 'category')">
+                    ＋ 為${meLabel}建立新分類板塊
+                </button>
+                <button
+                    style="width:100%; text-align:center; background:none; border:none; color:#CCC; margin-top:30px; cursor:pointer;"
+                    onclick="delProfile()">⛔ 刪除此成員紀錄</button>`;
         }
 
         /* 資料操作 */
@@ -993,6 +1096,33 @@
             }
         }
 
+        /* 共同 Tab 資料操作 */
+        window.pushSharedItem = function (cIdx) {
+            const ipt = document.getElementById('sipt_' + cIdx);
+            if (!ipt.value.trim()) return;
+            ensureSharedData();
+            localData.shared.categories[cIdx].items.push({
+                id: 'si_' + Date.now(),
+                text: ipt.value.trim()
+            });
+            ipt.value = '';
+            pushSync();
+        };
+
+        window.delSharedItem = function (cIdx, iIdx) {
+            ensureSharedData();
+            localData.shared.categories[cIdx].items.splice(iIdx, 1);
+            pushSync();
+        };
+
+        window.delSharedCategory = function (cIdx) {
+            if (confirm("確定刪除此共同分類？")) {
+                ensureSharedData();
+                localData.shared.categories.splice(cIdx, 1);
+                pushSync();
+            }
+        };
+
         /* Modal 邏輯 */
         function openModal(title, placeholder, action) {
             document.getElementById('modalTitle').textContent = title;
@@ -1032,6 +1162,13 @@
             else if (modalAction === 'category') {
                 localData.profiles[activeProfileIndex].categories.push({
                     id: 'c_' + Date.now(), name: val, items: []
+                });
+                pushSync();
+            }
+            else if (modalAction === 'shared_category') {
+                ensureSharedData();
+                localData.shared.categories.push({
+                    id: 'sc_' + Date.now(), name: val, items: []
                 });
                 pushSync();
             }
