@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>求生聯絡簿 📒 | 家人與伴侶共編版</title>
-    <!-- Gun.js 進行無伺服器去中心化即時同步 -->
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <!-- MQTT 進行無伺服器即時同步 -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         :root {
             --pink: #FF6B8B;
@@ -412,18 +412,23 @@
         /* =====================
            1. 系統與同步設定
            ===================== */
-        // 使用 Gun.js 的公共節點來做為 P2P 轉發
-        const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
+        // 使用 EMQX 公共 MQTT Broker 進行即時轉發
+        const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
+        let client = null;
         let roomID = new URLSearchParams(window.location.search).get('room');
-        let gunNode = null;
         let localData = { updatedAt: 0, profiles: [] };
         let activeProfileIndex = 0;
+
+        // 用來區分是不是自己發送的訊息
+        const myClientID = 'client_' + Math.random().toString(16).substr(2, 8);
+        const topicSync = 'collab_notebook_v4_' + roomID;
+        const topicReq = 'collab_notebook_req_' + roomID;
 
         // 檢查 URL 狀態
         if (roomID) {
             document.getElementById('welcomeView').style.display = 'none';
             document.getElementById('appView').style.display = 'block';
-            initGunSync();
+            initMqttSync();
         }
 
         function createRoom() {
@@ -431,17 +436,48 @@
             window.location.href = '?room=' + uuid;
         }
 
-        function initGunSync() {
+        function initMqttSync() {
             const loadBackup = localStorage.getItem('collab_book_' + roomID);
-            if (loadBackup) localData = JSON.parse(loadBackup);
+            if (loadBackup) {
+                localData = JSON.parse(loadBackup);
+            }
 
-            gunNode = gun.get('collab_notebook_v3_' + roomID);
+            // 顯示目前連線狀態為連線中
+            document.getElementById('syncText').textContent = '連線中...';
+            document.getElementById('syncDot').style.background = '#FF9800';
 
-            // 監聽遠端即時變更
-            gunNode.on((data) => {
-                if (data && data.stateStr) {
+            client = mqtt.connect(brokerUrl, {
+                clientId: myClientID,
+                clean: true,
+                connectTimeout: 4000,
+                reconnectPeriod: 1000,
+            });
+
+            client.on('connect', () => {
+                document.getElementById('syncText').textContent = '已即時連線';
+                document.getElementById('syncDot').style.background = '#4CAF50';
+
+                // 訂閱資料更新頻道與請求頻道
+                client.subscribe(topicSync);
+                client.subscribe(topicReq);
+
+                // 一連線就跟房間裡的人要最新資料
+                client.publish(topicReq, "give_me_data");
+            });
+
+            client.on('message', (topic, message) => {
+                if (topic === topicReq) {
+                    // 有新用戶請求資料，且我們有資料時，廣播目前資料
+                    if (message.toString() === "give_me_data" && localData.updatedAt > 0) {
+                        client.publish(topicSync, JSON.stringify({ sender: myClientID, data: localData }));
+                    }
+                } else if (topic === topicSync) {
                     try {
-                        const serverData = JSON.parse(data.stateStr);
+                        const payload = JSON.parse(message.toString());
+                        // 不要處理自己剛發出去的資料，避免無限迴圈
+                        if (payload.sender === myClientID) return;
+
+                        const serverData = payload.data;
                         // 如果伺服器的時間戳大於本地的，則覆蓋本地，並重新渲染UI
                         if (serverData.updatedAt > localData.updatedAt) {
                             localData = serverData;
@@ -449,12 +485,16 @@
                             render();
                             triggerSyncAnim();
                         }
-                    } catch (e) { console.error('Data parsing error'); }
-                } else if (localData.profiles.length === 0) {
-                    // 如果房間全新，自動預設一個角色
-                    addProfile('😎 我自己');
+                    } catch (e) { console.error('Data parsing error', e); }
                 }
             });
+
+            // 如果本地還是空的，加入預設
+            setTimeout(() => {
+                if (localData.profiles.length === 0) {
+                    addProfile('😎 我自己');
+                }
+            }, 1000);
 
             // 如果本地本來就有舊資料，先畫出來
             render();
@@ -464,14 +504,17 @@
         function pushSync() {
             localData.updatedAt = Date.now();
             localStorage.setItem('collab_book_' + roomID, JSON.stringify(localData));
-            gunNode.put({ stateStr: JSON.stringify(localData) });
+            if (client && client.connected) {
+                // 發布更新，讓所有訂閱者看到
+                client.publish(topicSync, JSON.stringify({ sender: myClientID, data: localData }), { retain: true });
+                triggerSyncAnim();
+            }
             render();
-            triggerSyncAnim();
         }
 
         function triggerSyncAnim() {
             const dot = document.getElementById('syncDot');
-            dot.style.background = '#00BCD4'; // 變為藍色代表同步中
+            dot.style.background = '#2196F3'; // 變為藍色代表同步中
             setTimeout(() => dot.style.background = '#4CAF50', 500); // 變回綠色
         }
 
