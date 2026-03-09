@@ -543,6 +543,21 @@
             font-weight: bold;
             cursor: pointer;
         }
+
+        /* 統計數據樣式 */
+        .stats-info {
+            font-size: 13px;
+            color: #888;
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.03);
+            display: inline-block;
+        }
+
+        .stats-info strong {
+            color: var(--pink);
+        }
     </style>
 </head>
 
@@ -553,6 +568,7 @@
         <h1>📒 求生群組小本本</h1>
         <p>可以建立無限多個群組 (家人/朋友/情侶)。<br>每個群組網址獨立，你能在上方清單隨時切換，但你分享網址給朋友時，他們只看得到該群組！</p>
         <button class="btn-main" onclick="openCreateGroupModal()">➕ 建立我的第一個群組</button>
+        <div class="stats-info" id="welcomeStats">載入統計中...</div>
     </div>
 
     <!-- 主應用區 -->
@@ -567,6 +583,10 @@
                 <button class="btn-small" onclick="openCreateGroupModal()">+ 開新群組</button>
                 <button class="btn-small" style="background:#4CAF50;" onclick="shareRoom()">🔗 給這群別人</button>
             </div>
+        </div>
+
+        <div style="text-align: center; margin: 10px 0;">
+            <div class="stats-info" id="appStats">載入統計中...</div>
         </div>
 
         <!-- 房間內容 -->
@@ -591,6 +611,7 @@
             <input type="text" id="newIdentityName" placeholder="我是... (例如: 老爸)"
                 style="padding:12px; border:1px solid #CCC; border-radius:10px; text-align:center; width: 100%; max-width:300px; margin-bottom:10px;">
             <button class="btn-main" style="max-width:300px;" onclick="createNewIdentity()">＋ 建立我的身分</button>
+            <div class="stats-info" id="identityStats" style="margin-top: 30px;">載入統計中...</div>
         </div>
 
         <!-- 筆記本操作層 -->
@@ -631,6 +652,46 @@
         let myProfileId = null;
         let searchQuery = "";
 
+        // 使用人數統計
+        const statsWorkerUrl = 'https://relationship-notebook-stats.love7053150.workers.dev'; // 這是你的 Worker 網址
+        let visitorId = localStorage.getItem('notebook_visitor_id');
+        if (!visitorId) {
+            visitorId = 'v_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+            localStorage.setItem('notebook_visitor_id', visitorId);
+        }
+
+        async function reportActivity() {
+            if (!currentRoomId || !statsWorkerUrl) return;
+            try {
+                await fetch(`${statsWorkerUrl}/report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        visitorId: visitorId,
+                        roomId: currentRoomId,
+                        profileCount: localData.profiles.length,
+                        roomName: localData.name
+                    })
+                });
+            } catch (e) {
+                console.warn('Stats reporting failed', e);
+            }
+        }
+
+        async function fetchStats() {
+            if (!statsWorkerUrl) return;
+            try {
+                const res = await fetch(`${statsWorkerUrl}/stats`);
+                const data = await res.json();
+                const text = `✨ 全球共有 <strong>${data.uniqueUsers}</strong> 位勇者，建立了 <strong>${data.totalGroups}</strong> 個群組`;
+                if (document.getElementById('welcomeStats')) document.getElementById('welcomeStats').innerHTML = text;
+                if (document.getElementById('appStats')) document.getElementById('appStats').innerHTML = text;
+                if (document.getElementById('identityStats')) document.getElementById('identityStats').innerHTML = text;
+            } catch (e) {
+                console.warn('Fetch stats failed', e);
+            }
+        }
+
         function ensureSharedData() {
             if (!localData.shared) {
                 localData.shared = {
@@ -667,6 +728,8 @@
 
             renderRoomSelector();
             initMqttSync();
+            reportActivity();
+            fetchStats();
         }
 
         /* 群組切換與建立 */
@@ -749,6 +812,7 @@
                 triggerSyncAnim();
             }
             verifyIdentityState();
+            reportActivity();
         }
 
         function updateRoomNameInList(name) {
